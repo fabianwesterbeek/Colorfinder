@@ -7,12 +7,14 @@ import type { ColorSetId } from './types';
 
 const COLOR_SET_ORDER: ColorSetId[] = ['large', 'medium', 'small'];
 const DEFAULT_PICKER_COLOR = '#156B74';
+const THEME_STORAGE_KEY = 'colorfinder-theme';
 const MATCH_DEBOUNCE_MS_BY_SET: Record<ColorSetId, number> = {
   large: 30,
   medium: 3,
   small: 3
 };
 const GITHUB_REPO_URL = 'https://github.com/fabianwesterbeek/Colorfinder';
+type ThemePreference = 'light' | 'dark';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -30,11 +32,34 @@ function hasCoarsePointer(): boolean {
   return navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
 }
 
+function prefersDarkColorScheme(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function readStoredThemePreference(): ThemePreference | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === 'light' || stored === 'dark' ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [query, setQuery] = useState('');
   const [activeSetId, setActiveSetId] = useState<ColorSetId>(DEFAULT_COLOR_SET);
   const [isCustomPickerOpen, setIsCustomPickerOpen] = useState(false);
   const [isCoarsePointer, setIsCoarsePointer] = useState(hasCoarsePointer);
+  const [themePreference, setThemePreference] = useState<ThemePreference | null>(() => readStoredThemePreference());
+  const [prefersDarkMode, setPrefersDarkMode] = useState(prefersDarkColorScheme);
   const [pickerHsv, setPickerHsv] = useState(() => hexToHsv(DEFAULT_PICKER_COLOR) ?? { h: 190, s: 0.8, v: 0.46 });
 
   const pickerRootRef = useRef<HTMLDivElement | null>(null);
@@ -49,6 +74,8 @@ export default function App() {
   const hueColor = useMemo(() => hsvToHex({ h: pickerHsv.h, s: 1, v: 1 }), [pickerHsv.h]);
   const swatchColor = normalizedHex ?? pickerHex;
   const isMobileSheet = isCoarsePointer && isCustomPickerOpen;
+  const effectiveTheme: ThemePreference = themePreference ?? (prefersDarkMode ? 'dark' : 'light');
+  const isDarkMode = effectiveTheme === 'dark';
 
   const matches = useMemo(() => {
     if (!debouncedNormalizedHex) {
@@ -123,6 +150,49 @@ export default function App() {
     media.addListener(handleChange);
     return () => media.removeListener(handleChange);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      setPrefersDarkMode(media.matches);
+    };
+
+    handleChange();
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return;
+    }
+
+    if (themePreference) {
+      document.documentElement.dataset.theme = themePreference;
+    } else {
+      delete document.documentElement.dataset.theme;
+    }
+
+    try {
+      if (themePreference) {
+        window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
+      } else {
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage access failures in private/locked contexts.
+    }
+  }, [themePreference]);
 
   useEffect(() => {
     if (!normalizedHex) {
@@ -206,8 +276,16 @@ export default function App() {
     }
   };
 
+  const toggleTheme = useCallback(() => {
+    setThemePreference((current) => {
+      const currentTheme = current ?? (prefersDarkMode ? 'dark' : 'light');
+      return currentTheme === 'dark' ? 'light' : 'dark';
+    });
+  }, [prefersDarkMode]);
+
   const saturationPercent = pickerHsv.s * 100;
   const valuePercent = (1 - pickerHsv.v) * 100;
+  const themeToggleLabel = isDarkMode ? 'Switch to light mode' : 'Switch to dark mode';
 
   return (
     <main className="app-shell">
@@ -423,6 +501,18 @@ export default function App() {
           </svg>
           <span>View on GitHub</span>
         </a>
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={themeToggleLabel}
+          aria-pressed={isDarkMode}
+          title={themeToggleLabel}
+          onClick={toggleTheme}
+        >
+          <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M20.3 14.2A8.6 8.6 0 1 1 9.8 3.7a.5.5 0 0 1 .5.8 6.9 6.9 0 0 0 9.5 9.5.5.5 0 0 1 .5.2.5.5 0 0 1 0 .5Z" />
+          </svg>
+        </button>
       </footer>
     </main>
   );

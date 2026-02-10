@@ -3,12 +3,24 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
-function mockCoarsePointer(matches: boolean): void {
+type MatchMediaOptions = {
+  coarsePointer?: boolean;
+  prefersDark?: boolean;
+};
+
+function mockMatchMedia(options: MatchMediaOptions = {}): void {
+  const { coarsePointer = false, prefersDark = false } = options;
+
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches,
+      matches:
+        query === '(pointer: coarse)'
+          ? coarsePointer
+          : query === '(prefers-color-scheme: dark)'
+            ? prefersDark
+            : false,
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -23,19 +35,59 @@ function mockCoarsePointer(matches: boolean): void {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  window.localStorage.clear();
+  delete document.documentElement.dataset.theme;
 });
 
 describe('App interaction flow', () => {
   it('renders a footer link to the GitHub repository', () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     render(<App />);
 
     const githubLink = screen.getByRole('link', { name: /view colorfinder on github/i });
     expect(githubLink).toHaveAttribute('href', 'https://github.com/fabianwesterbeek/Colorfinder');
   });
 
+  it('defaults to dark theme when the system preference is dark', () => {
+    mockMatchMedia({ prefersDark: true });
+    render(<App />);
+
+    const toggle = screen.getByRole('button', { name: /switch to light mode/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('defaults to light theme when the system preference is light', () => {
+    mockMatchMedia({ prefersDark: false });
+    render(<App />);
+
+    const toggle = screen.getByRole('button', { name: /switch to dark mode/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('persists an explicit theme override when toggled', async () => {
+    mockMatchMedia({ prefersDark: false });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /switch to dark mode/i }));
+
+    const toggle = screen.getByRole('button', { name: /switch to light mode/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(window.localStorage.getItem('colorfinder-theme')).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('uses stored theme preference on initial render', () => {
+    window.localStorage.setItem('colorfinder-theme', 'dark');
+    mockMatchMedia({ prefersDark: false });
+    render(<App />);
+
+    const toggle = screen.getByRole('button', { name: /switch to light mode/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('shows guidance for invalid input', async () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     const user = userEvent.setup();
     render(<App />);
 
@@ -46,7 +98,7 @@ describe('App interaction flow', () => {
   });
 
   it('shows 10 closest matches for valid input', async () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     const user = userEvent.setup();
     render(<App />);
 
@@ -58,7 +110,7 @@ describe('App interaction flow', () => {
   });
 
   it('switches color sets and keeps a single active option', async () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     const user = userEvent.setup();
     render(<App />);
 
@@ -79,7 +131,7 @@ describe('App interaction flow', () => {
   });
 
   it('opens and closes custom picker on desktop', async () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     const user = userEvent.setup();
     render(<App />);
 
@@ -98,7 +150,7 @@ describe('App interaction flow', () => {
   });
 
   it('updates results while hue slider changes', async () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     const user = userEvent.setup();
     render(<App />);
 
@@ -113,7 +165,7 @@ describe('App interaction flow', () => {
   });
 
   it('keeps hue stable when changing saturation/value only', async () => {
-    mockCoarsePointer(false);
+    mockMatchMedia();
     const user = userEvent.setup();
     render(<App />);
 
@@ -132,7 +184,7 @@ describe('App interaction flow', () => {
 
   it('debounces closest-match updates while picker changes are happening', async () => {
     vi.useFakeTimers();
-    mockCoarsePointer(false);
+    mockMatchMedia();
     render(<App />);
 
     fireEvent.click(screen.getByRole('radio', { name: /small · css/i }));
@@ -166,7 +218,7 @@ describe('App interaction flow', () => {
 
   it('uses a 30ms debounce cadence for the large dataset', () => {
     vi.useFakeTimers();
-    mockCoarsePointer(false);
+    mockMatchMedia();
     render(<App />);
 
     fireEvent.click(screen.getByRole('radio', { name: /large · meodai\/color-names/i }));
@@ -186,7 +238,7 @@ describe('App interaction flow', () => {
 
   it('restarts debounce timing when switching datasets mid-flight', () => {
     vi.useFakeTimers();
-    mockCoarsePointer(false);
+    mockMatchMedia();
     render(<App />);
 
     fireEvent.click(screen.getByRole('radio', { name: /small · css/i }));
@@ -211,7 +263,7 @@ describe('App interaction flow', () => {
   });
 
   it('opens custom picker directly on coarse pointers without advanced or system picker options', async () => {
-    mockCoarsePointer(true);
+    mockMatchMedia({ coarsePointer: true });
     const user = userEvent.setup();
     render(<App />);
 
@@ -230,7 +282,7 @@ describe('App interaction flow', () => {
   });
 
   it('syncs native color input changes to normalized hex', () => {
-    mockCoarsePointer(true);
+    mockMatchMedia({ coarsePointer: true });
     render(<App />);
 
     const nativePicker = screen.getByLabelText(/native system color picker/i);
