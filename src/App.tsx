@@ -7,7 +7,11 @@ import type { ColorSetId } from './types';
 
 const COLOR_SET_ORDER: ColorSetId[] = ['large', 'medium', 'small'];
 const DEFAULT_PICKER_COLOR = '#156B74';
-const MATCH_DEBOUNCE_MS = 60;
+const MATCH_DEBOUNCE_MS_BY_SET: Record<ColorSetId, number> = {
+  large: 30,
+  medium: 3,
+  small: 3
+};
 const GITHUB_REPO_URL = 'https://github.com/fabianwesterbeek/Colorfinder';
 
 function clamp(value: number, min: number, max: number): number {
@@ -40,6 +44,7 @@ export default function App() {
   const normalizedHex = useMemo(() => normalizeHex(query), [query]);
   const [debouncedNormalizedHex, setDebouncedNormalizedHex] = useState<string | null>(normalizedHex);
   const activeSet = COLOR_SETS[activeSetId];
+  const matchDebounceMs = MATCH_DEBOUNCE_MS_BY_SET[activeSetId];
   const pickerHex = useMemo(() => hsvToHex(pickerHsv), [pickerHsv]);
   const hueColor = useMemo(() => hsvToHex({ h: pickerHsv.h, s: 1, v: 1 }), [pickerHsv.h]);
   const swatchColor = normalizedHex ?? pickerHex;
@@ -127,12 +132,12 @@ export default function App() {
 
     const timeoutId = window.setTimeout(() => {
       setDebouncedNormalizedHex(normalizedHex);
-    }, MATCH_DEBOUNCE_MS);
+    }, matchDebounceMs);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [normalizedHex]);
+  }, [matchDebounceMs, normalizedHex]);
 
   useEffect(() => {
     if (!isCustomPickerOpen) {

@@ -8,7 +8,8 @@
     "generate:data": "node --import tsx ./scripts/generate-color-data.ts",
     "build": "npm run generate:data && tsc -b && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bench:match": "node --import tsx ./scripts/bench-match.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.7",

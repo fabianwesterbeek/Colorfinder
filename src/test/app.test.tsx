@@ -140,7 +140,7 @@ describe('App interaction flow', () => {
     fireEvent.change(input, { target: { value: '#FF0000' } });
 
     act(() => {
-      vi.advanceTimersByTime(60);
+      vi.advanceTimersByTime(3);
     });
 
     const initialFirstRowText = screen.getAllByRole('listitem')[0]?.textContent;
@@ -154,7 +154,7 @@ describe('App interaction flow', () => {
     expect(screen.getAllByRole('listitem')[0]?.textContent).toBe(initialFirstRowText);
 
     act(() => {
-      vi.advanceTimersByTime(59);
+      vi.advanceTimersByTime(2);
     });
     expect(screen.getAllByRole('listitem')[0]?.textContent).toBe(initialFirstRowText);
 
@@ -162,6 +162,52 @@ describe('App interaction flow', () => {
       vi.advanceTimersByTime(1);
     });
     expect(screen.getAllByRole('listitem')[0]?.textContent).not.toBe(initialFirstRowText);
+  });
+
+  it('uses a 30ms debounce cadence for the large dataset', () => {
+    vi.useFakeTimers();
+    mockCoarsePointer(false);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /large · meodai\/color-names/i }));
+    const input = screen.getByLabelText(/hex color/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '#FF0000' } });
+
+    act(() => {
+      vi.advanceTimersByTime(29);
+    });
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getAllByRole('listitem')).toHaveLength(10);
+  });
+
+  it('restarts debounce timing when switching datasets mid-flight', () => {
+    vi.useFakeTimers();
+    mockCoarsePointer(false);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /small · css/i }));
+    const input = screen.getByLabelText(/hex color/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '#FF0000' } });
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: /large · meodai\/color-names/i }));
+
+    act(() => {
+      vi.advanceTimersByTime(29);
+    });
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getAllByRole('listitem')).toHaveLength(10);
   });
 
   it('opens custom picker directly on coarse pointers without advanced or system picker options', async () => {
