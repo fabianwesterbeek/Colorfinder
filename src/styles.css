@@ -13,6 +13,7 @@
   --line: #ccd6da;
   --accent: #156b74;
   --accent-soft: #d6eaed;
+  --github-hover: #6b4ce6;
 }
 
 * {
@@ -45,9 +46,14 @@ body::before {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(20rem, 30rem) 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'intro results'
+    'footer footer';
 }
 
 .tool-intro {
+  grid-area: intro;
   padding: 2rem 1.5rem 2.5rem;
   border-right: 1px solid var(--line);
   display: flex;
@@ -356,6 +362,8 @@ label,
 }
 
 .results-pane {
+  grid-area: results;
+  min-height: 0;
   padding: 2rem 1.5rem 2.5rem;
   display: grid;
   gap: 1rem;
@@ -432,9 +440,11 @@ label,
 }
 
 .app-footer {
-  grid-column: 1 / -1;
+  grid-area: footer;
   border-top: 1px solid var(--line);
   padding: 0.85rem 1.5rem 1rem;
+  display: flex;
+  justify-content: center;
 }
 
 .github-link {
@@ -446,10 +456,12 @@ label,
   text-decoration: none;
   font-size: 0.9rem;
   letter-spacing: 0.02em;
+  transition: color 140ms ease;
 }
 
-.github-link:hover {
-  text-decoration: underline;
+.github-link:hover,
+.github-link:focus-visible {
+  color: var(--github-hover);
 }
 
 .github-logo {
@@ -471,7 +483,8 @@ label,
 
 @media (prefers-reduced-motion: reduce) {
   .swatch-trigger,
-  .picker-panel {
+  .picker-panel,
+  .github-link {
     animation: none;
     transition: none;
   }
@@ -480,6 +493,11 @@ label,
 @media (max-width: 920px) {
   .app-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'intro'
+      'results'
+      'footer';
   }
 
   .tool-intro {
