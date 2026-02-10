@@ -289,13 +289,21 @@ export function findClosestColorsPrepared(inputHex: string, prepared: PreparedCo
   for (let index = 0; index < names.length; index += 1) {
     const name = names[index]!;
     const offset = index * 3;
+    const l2 = lab65Values[offset];
+    const a2 = lab65Values[offset + 1];
+    const b2 = lab65Values[offset + 2];
+
+    if (l2 === undefined || a2 === undefined || b2 === undefined) {
+      continue;
+    }
+
     const deltaE = ciede2000Lab65(
       l1,
       a1,
       b1,
-      lab65Values[offset],
-      lab65Values[offset + 1],
-      lab65Values[offset + 2],
+      l2,
+      a2,
+      b2,
     );
 
     if (topMatches.length === limit) {
